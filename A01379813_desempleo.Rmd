@@ -1,0 +1,268 @@
+---
+title: "A01379813_desempleo"
+author: "Joaquín Rodrigo Ponce de León Conconi"
+date: "3/2/2021"
+output:
+  html_document:
+    df_print: paged
+  word_document: default
+Institución: Tecnológico de Monterrey
+matrícula: A01379813
+grupo: '700'
+Campus: Monterrey
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Introducción
+Una persona es considerada desempleada cuando es económicamente activa––pertenece a la Población Económicamente Activa––y no cuenta con un empleo [1]. El desempleo es un serio problema en la economía a nivel personal y social debido a que hay una pérdida de ingresos y producción; además, de una pérdida de capital humano (el valor, dadas las capacidades de un individuo, se deprecia) [2]. Para un país es importante medir la tasa de desempleo, ya que indica la salud de la economía de este debido a que entre más gente desempleada haya––el desempleo provoca reducción de gastos––, habrá menos demanda––provocando más pérdidas de empleos [1].
+
+Datos de México
+Para tener una mejor perspectiva de lo que es el desempleo, se realizó un análisis de datos ocupando la base datos del INEGI referenciada en la referencia [3]. Las fechas consideradas fueron del 2010 al 2019 y el análisis se realizó en tres partes: población desocupada por edad, población desocupada por entidad federativa y Tasa de condiciones críticas de ocupación (TCCO).
+Para el análisis de datos, se utilizó el lenguaje de programación R en conjunto con RStudio. A continuación, se muestra el análisis exploratorio de la base de datos depurada previamente en Excel, la cual contiene información sobre la población desocupada por rango de edad (el código será mostrado para que sea replicable este estudio). Si no se quiere ver el código utilizado, al final de cada apartado viene el análisis gráfico.
+Análisis de la población desocupada por edad
+Se llamaron a las librerías.
+```{r}
+library("readxl") #Esta librería permite descargar archivos Excel.
+library("tidyverse") #Esta librería contiene múltiples librerías para facilitar el trabajo
+```
+
+Se descargó el archivo de Excel y se analizó.
+```{r}
+pob_edad <- read_excel("INEGI_pob_edad.xls")
+pob_edad[,c(1,2,3)] #Se ven las primeras 3 columnas de la base de datos
+```
+Se analizaron las diferentes variables que tiene pob_edad.
+```{r}
+names(pob_edad)
+```
+Se vio que son 44 variables dado que está dividido en trimestres cada año. Ya que no era de interés hacer un análisis muy específico, se creó una nueva base de datos (year_pob_edad); la cual simplifica los trimestres en años; obteniendo el promedio de los cuatro trimestres para cada año. Además, se descartaron los datos del 2020 debido a que están incompletos.
+```{r}
+n_pob_edad <- pob_edad%>%select(c(-2,-3,-4)) #No contiene datos del año 2020
+head(n_pob_edad)
+
+#Se hace un ciclo for para obtener el promedio de los trimestres para cada año
+y <- 2019
+k <- 0
+year_pob_edad <- data.frame(n_pob_edad[,1])
+for (i in 1:10){
+  col <- rowMeans(n_pob_edad[, k+c(2,3,4,5)])
+  year_pob_edad <- cbind(year_pob_edad, col)
+  names(year_pob_edad)[i+1]<-y
+  k <- k+4
+  y<-y-1
+}
+head(year_pob_edad) #Se observan los datos
+```
+Teniendo la nueva base de datos, se alargó (se pusieron los años como renglones) para poder realizar un análisis visual de manera más sencilla. La nueva base de datos se llamó an_pob_edad.
+```{r}
+edad_pob_edad <- data.frame("Edad"=c("Total", "15 a 19", "20 a 29", "30 a 39", "40 a 49", "50 a 59", "60≤", "No especificado"))
+edad_pob_edad <- data.frame("Edad"=rep(edad_pob_edad[,1], 10))#Se crea data frame con rangos de edad
+
+pob_pob_edad <- data.frame(year_pob_edad[ ,2]) #Se crea un data frame para guardar la población desocupada
+
+#Se hace un ciclo for para acomodar a la población desocupada de manera vertical
+c <- 3
+k <- 1
+for (i in 1:72){
+  row <- year_pob_edad[k ,c]
+  pob_pob_edad <- rbind(pob_pob_edad, row)
+  k <- k+1
+  if (k==9){
+    k <- 1
+    c <- c+1
+  }
+}
+pob_pob_edad
+
+y_pob_edad <- data.frame(rep(2019, 8))#Se crea data frame con años
+#Se hace un ciclo for para agregar años
+y <- 2018
+c<-0
+for (j in 1:72){
+  y_pob_edad <- rbind(y_pob_edad, y)
+  c <- c+1
+  if (c==8){
+    c <- 0
+    y <- y-1
+  }
+}
+y_pob_edad
+
+an_pob_edad<-cbind(edad_pob_edad, y_pob_edad, pob_pob_edad) 
+names(an_pob_edad) <- c("Edad", "Año", "Población Desocupada")
+an_pob_edad #Data frame para realizar análisis visual
+```
+Con la nueva base de datos se realizó el análisis visual, descartando el Total para solo analizar los rangos de edad. 
+```{r}
+an_pob_edad[an_pob_edad[,1]!="Total",]%>%group_by(Edad)%>%summarise(avg=mean(`Población Desocupada`))%>%
+  ggplot(aes(Edad, avg))+ylab("Población desocupada promedio")+xlab("Rango de edad")+ggtitle("Figura 1. Población desocupada por rango de edad (2010-2019)")+geom_bar(stat = "identity", fill="617")
+```
+La Figura 1. sugiere que del año 2010 al 2019, en promedio, las personas de entre 20 a 29 años son las más desocupadas y las menos desocupadas son aquellas de 60 años o más. Para profundizar en el análisis, a continuación, se creó una gráfica de barras, la cual indica la cantidad de población desocupada por año y permite identificar los rangos de edad para conocer qué proporción representan en las barras.
+```{r}
+#Bar plot 
+an_pob_edad[an_pob_edad[,1]!="Total",]%>%group_by(Año)%>%ggplot(aes(x=factor(Año), y=`Población Desocupada`, col=Edad))+xlab("Año")+ggtitle("Figura 2. Población desocupada por año y por rango de edad ")+geom_bar(stat = "identity")
+#Base de datos con población desocupada total por año
+y_pob <- an_pob_edad[an_pob_edad[,1]!="Total",]%>%group_by(Año)%>%summarise(`Población Desocupada`=sum(`Población Desocupada`))
+y_pob
+#Scatterplot
+
+y_pob %>% ggplot(aes(x=factor(Año), y=`Población Desocupada`, col=factor(Año)))+xlab("Año")+ggtitle("Figura 3. Población desocupada por año")+geom_point()
+```
+Las Figuras 2 y 3 muestran que la desocupación ha ido decreciendo, lo cual es bueno dado que la salud de la economía del país se ve beneficiada al no haber tanta gente desempleada que no tenga capacidad de consumir bienes y servicios.
+Para entender mejor la desocupación de la gente, por rango de edad, del año 2010-2019, se hizo un gráfico que muestra el proceso de la desocupación por rango de edad y por año.
+```{r}
+an_pob_edad[an_pob_edad[,1]!="Total",]%>%group_by(Año)%>%ggplot(aes(x=Año, y=`Población Desocupada`, col=Edad))+ggtitle("Figura 4. Población desocupada por año y por edad")+geom_line()+geom_point()
+```
+La Figura 4, sugiere que la disminución de desocupación, del año 2010 al 2018, es proporcional en todos los rangos de edad. Sin embargo, se puede observar que la cantidad de personas desocupadas aumentó del año 2018 a 2019 para todos los grupos. Además, la gráfica sugiere que hay mucha más población desocupada, que entra en el rango de edad de 20 a 29 años y este comportamiento, grosso modo, es constante alrededor de los años.
+El desempleo de jóvenes del rango de edad de 21 a 24 años corresponde a una cantidad significativa de egresados de universidades privadas y públicas que no encuentran trabajo en el mercado laboral [4]. Otro factor relacionado con la desocupación en jóvenes es la gran proporción de empleos informales que los absorben [5]; esto debe a que las condiciones laborales son precarias, las cuales afectan a los jóvenes en aspectos salariales y de largas jornadas (entre otros abusos) [4].
+Análisis de la población desocupada por entidad federativa 
+En este apartado se analizan los datos referentes a la población desocupada por cada entidad federativa. De esta manera, se determinó si influyen diferentes regiones geográficas de la República Mexicana en el desempleo. La base de datos utilizada en este análisis fue depurada previamente en Excel para facilitar el análisis. Se obtuvieron los datos en la referencia número tres, de la página del INEGI.
+
+```{r}
+pob_ent_fed <- read_excel("INEGI_pob_entfed.xlsx") #Data frame con datos depurados
+summary(pob_ent_fed)
+head(pob_ent_fed)#Primeros 6 renglones
+tail(pob_ent_fed)#Últimas 6 filas
+```
+Para conocer la estructura de la base de datos y los componentes de las diferentes variables, se escribió el siguiente código
+```{r}
+str(pob_ent_fed) #Estructura de la base de datos
+levels(factor(pob_ent_fed$`Entidad Federativa`))
+```
+Se observó la estructura de la base de datos, la cual tiene 1419 filas y 3 columnas. Las variables que la constituyen son Periodo de encuesta, Total (número de gente desocupada) y Entidad Federativa. Además, se observaron los niveles, los cuales representan a los 32 estados de la Nación (Descartando “Total”, dado que ésta abarca todas las Entidades Federativas).
+
+```{r}
+levels(factor(pob_ent_fed$`Periodo de encuesta`))
+
+```
+Se observó que la base de datos toma en cuenta el año 2020, el cual el cual fue  eliminado. Dado que son 3 trimestres del año 2020 para cada entidad federativa y el total, se debe de tener una base de datos con 1320 filas.
+```{r}
+pob_ent_fed1 <- pob_ent_fed%>%filter(!(`Periodo de encuesta` %in% c("Cuarto trimestre del 2020", "Tercer trimestre del 2020", "Primer trimestre del 2020")))
+pob_ent_fed1
+```
+```{r}
+pob_ent_fed1[1:4,]
+k <- 0
+y <- 2019
+avg <- data.frame()
+year <- data.frame()
+ent <- data.frame()
+for (i in 1:330){
+  tot_avg <- colMeans(pob_ent_fed1[k+1:4,"Total"])
+  avg <- rbind(avg, tot_avg)
+  ent <- rbind(ent, unique(pob_ent_fed1[k+1:4,"Entidad Federativa"]))
+  k <- k+4
+  year <- rbind(year, y)
+  y <- y-1
+  if (y==2009){
+    y<-2019
+  }
+}
+av_pobent_fed <- cbind(year, avg, ent)
+names(av_pobent_fed)<-c("Año", "Población Desocupada", "Entidad Federativa")
+av_pobent_fed
+```
+ av_pobent_fed es la base de datos, en la que se obtuvieron los promedios de los trimestres de cada año para poder realizar un análisis visual menos específico. A continuación, se presentan los gráficos.
+```{r}
+av_pobent_fed %>% filter(!(`Entidad Federativa` %in% c("Total") ))%>%
+  group_by(`Entidad Federativa`) %>% summarise(avg = mean(`Población Desocupada`))%>%
+  ggplot(aes(x=`Entidad Federativa`, y=avg))+
+  theme(axis.text.x = element_text(angle = 90))+
+  ylab("Promedio de población desocupada")+
+  ggtitle("Figura 5. Promedio de población desocupada (2010-2019) vs Estado")+
+  geom_bar(stat = "identity", fill="forest green")
+```
+Se puede observar que el estado con más personas desocupadas en promedio, desde el año 2010 al 2019, es México con 393808.1. En segundo lugar, se tiene a la Ciudad de México con ~ 247789 personas desempleadas en promedio.
+```{r}
+#Valor promedio de población desempleada en México
+av_pobent_fed %>% filter(!(`Entidad Federativa` %in% c("Total") ))%>%group_by(`Entidad Federativa`) %>% summarise(avg = mean(`Población Desocupada`))%>%.$avg%>%max()
+
+#Fila de la Ciudad de México
+av_pobent_fed %>% filter(!(`Entidad Federativa` %in% c("Total") ))%>%group_by(`Entidad Federativa`) %>% summarise(avg = mean(`Población Desocupada`))%>%filter(`Entidad Federativa`=="Ciudad de México")
+```
+Para ver de forma gráfica cuáles son los estados con la mayor cantidad de gente desocupada a la menor, se escribe el siguiente código:
+
+```{r}
+av_pobent_fed %>% filter(!(`Entidad Federativa` %in% c("Total") ))%>%
+  group_by(`Entidad Federativa`) %>% summarise(avg = mean(`Población Desocupada`))%>%
+  ggplot(aes(x=reorder(`Entidad Federativa`, -avg), y=avg))+
+  theme(axis.text.x = element_text(angle = 90))+
+  ylab("Promedio de población desocupada")+
+  xlab("Entidad Federativa")+
+  ggtitle("Figura 6. Promedio población desocupada (2010-2019) vs Estado (desc.)")+
+  geom_bar(stat = "identity", fill="forest green")
+```
+Figura 5 y 6, muestran que en promedio ha habido más personas desempleadas del año 2010 al 2019. Sin embargo, eso no significa que México sea la Entidad Federativa con más desempleados. Para ello se calculó la tasa de desempleo por estado, dividiendo el número de desempleados entre la población total.  
+```{r}
+df <- av_pobent_fed %>% filter(!(`Entidad Federativa` %in% c("Total") ))%>%group_by(`Entidad Federativa`) %>% summarise(avg = mean(`Población Desocupada`))
+df
+```
+Se creó un vector con la población total de cada entidad (los datos fueron obtenidos de la referencia 6) y se hace el análisis para conocer el porcentaje de personas desocupadas respecto a la población total.
+```{r}
+pob_tot_ent <- c(1273404, 3443792, 745601, 897291, 5200849, 3681473, 8870622, 2932657, 713612, 1750791, 5780123, 3551527, 2850714, 7857979, 16672099, 4571000, 1902329, 1206119, 5028766, 3991911, 6144886, 1980225, 1539101, 2733708, 2965379, 2900849, 2364632, 3511463, 1265055, 7998824, 2097203, 1566089)
+df1 <- cbind(df, pob_tot_ent)
+df1 %>% summarise(tasa_deso=(avg/pob_tot_ent), `Entidad Federativa`) %>%
+  ggplot(aes(x=reorder(`Entidad Federativa`, -tasa_deso), y=tasa_deso))+
+  theme(axis.text.x = element_text(angle = 90))+
+  ylab("Tasa de población desocupada")+
+  xlab("Entidad Federativa")+
+  ggtitle("Figura 7. Tasa de población desocupada (2010-2019) vs Entidad Federativa")+
+  geom_bar(stat = "identity", fill="orange")
+  
+```
+La Figura 7, indica que Tabasco es el estado con más desocupación. Sin embargo, la gráfica revelaría verdades más precisas si la tasa se calculara como la razón entre el promedio de desempleados, a lo largo del 2010 hasta el 2019 y la población económicamente activa, para cada estado. No obstante, la gráfica es asertiva al indicar que Tabasco es la Entidad Federativa con más desempleo, dado que al menos en el año 2015 y 2017 fue el estado con mayor desocupación en el país [7, 8].
+
+Tasa de Condiciones Críticas de Ocupación (TCCO) 
+
+Esta tasa es la proporción de la población ocupada, la cual labora menos de 35 horas por semana por razones de mercado y la que trabaja más de 48 horas por semana, ganando de 1 a 2 salarios mínimos, o la que labora más de 35 horas semanales con ingresos mensuales menores al salario mínimo [9].
+Se hizo una búsqueda de datos y se encontraron datos del año 2010 al 2019. Con éstos, se realiza un análisis para determinar cómo ha evolucionado la TCCO a lo largo de los años mencionados (los datos se encuentran en la referencia [10]). La Figura 8 muestra una curva que se ajusta a los datos e incluye intervalos de confianza (área sombreada).
+
+```{r}
+per <- 2010:2019
+por <- c(12.0, 11.3, 11.8, 12.0, 11.7, 12.5, 13.8, 13.8, 15.5, 19.0)
+tcco <- data.frame(per,por)
+tcco
+```
+```{r}
+tcco %>%ggplot(aes(x=per, y=por))+
+  xlab("Año")+
+  ylab("TCCO promedio (porcentaje respecto a la PEA)")+
+  ggtitle("Figura 8. TCCO vs Año" )+
+  geom_point()+geom_smooth()
+```
+Se observa que la tasa del 2019 es ~158% más grande que la del 2010. Los datos revelan que las condiciones son cada vez más injustas en el sector laboral [4], lo cual afecta a la economía negativamente.
+
+Trabajadores desalentados y migración
+
+Un trabajador desalentado es aquel que ha dejado de buscar trabajo, porque no encuentra o porque no le son favorables las condiciones de trabajo. Este tipo de laborante, usualmente se le considera parte de la población inactiva (dado que no está buscando trabajo). Sin embargo, es una persona que realmente debería ser considerada activa debido a que muchas veces representa un problema en la economía, ya que se subestima el verdadero nivel de desempleo––es decir la situación parece no ser tan mala como realmente es [11] y este es el problema que tienen los trabajadores desalentados, que al decir que no buscan trabajo se consideran parte de la población inactiva cuando realmente son activos desocupados.
+La migración es un medio para mejorar la calidad de vida de las personas. Aquellos individuos que viven en lugares donde no son contratados o donde las condiciones son inseguras en términos económicos, tienden a migrar a otra ubicación [12]. En México se está perdiendo mano de obra valiosa, que podría ser productiva en el país debido a que la gente está buscando mejores oportunidades [13]. Es decir, se está experimentando una pérdida de capital humano en este país debido al desempleo. Se ha visto que las condiciones económicas desfavorables provocan migración, pero solamente la gente que se encuentra desempleada [14]. 
+
+Conclusión
+
+Al analizar los datos de población desocupada por edad, se observó que la mayor parte de la población no empleada está dentro del rango de 20 a 29 años y aunque la cantidad de gente desocupada decreció del año 2010 al 2019, sigue habiendo una gran diferencia entre el número de individuos que entran en el intervalo de edad mencionado y los demás rangos de edad. 
+Realizando el análisis para la población desocupada por Entidad Federativa entre los años 2010-2019, se observó que Tabasco es el estado con más desempleados. La tasa no fue calculada con base en la población económicamente activa, sino con la población total de cada estado. Sin embargo, los resultados, aunque quizá no revelen las verdades más certeras, sí abarcan a los estados con más desocupación, ya que se comprobó con investigación.
+Se vio con base en el TCCO, que las condiciones laborales son cada vez más injustas dado que el porcentaje creció considerablemente de 2010 a 2019. Esta tasa puede ser una de las razones por las que hay trabajadores desalentados, los cuales llegan a provocar que el nivel de desempleo que se calcula no refleje la verdad de una sociedad. Además, la tasa puede explicar por qué hay mucha gente de 20 a 29 años sin trabajo. 
+El desempleo a largo plazo afecta a la economía de un país, porque puede provocar que los trabajadores sean absorbidos por empleos informales o incluso provocar migración, la cual provoca disminución de productividad en un país. 
+
+
+Referencias
+[1] Purdy, E. R., PhD. (2020). Unemployment. Salem Press Encyclopedia. 
+[2] Parkin, M. (2018). Economía. 12ava edición. México: Editorial Pearson. pp-516. 
+[3] Encuesta Nacional de Ocupación y Empleo. (s.f.). INEGI. Recuperado de https://www.inegi.org.mx/programas/enoe/15ymas/#Tabulados 
+[4] Martínez, T & Valdelarame, J. (2016). Jóvenes de 20 a 29 años con más desempleo en 11 años. El Financiero. Recuperado de https://www.elfinanciero.com.mx/economia/jovenes-de-20-a-29-anos-con-mas-desempleo-en-11-anos 
+[5] ESTADÍSTICAS A PROPÓSITO DEL DÍA INTERNACIONAL DE LA JUVENTUD (12 DE AGOSTO). (2018). INEGI. Recuperado de https://www.inegi.org.mx/contenidos/saladeprensa/aproposito/2018/juventud2018_Nal.pdf 
+[6] Indicadores por entidad federativa. (s.f.). INEGI. Recuperado de https://www.inegi.org.mx/app/estatal/ 
+[7]Estos son los estados donde hay más desempleo en México. (2017). Animal Político. Recuperado de https://www.animalpolitico.com/2017/11/estados-mexico-desempleo-inegi/ 
+[8] ¿Cuáles son los estados con más desempleo en México?. (2015). Forbes. Recuperado de https://www.forbes.com.mx/cuales-son-los-estados-con-mas-desempleo-en-mexico/ 
+[9] TCCO, (Tasa de Condiciones Críticas de Ocupación). (s.f.). INEGI. Recuperado de https://www.inegi.org.mx/app/glosario/default.html?p=ENE
+[10] Tasa de condiciones críticas de ccupación. (s.f.). INEGI. Recuperado de https://www.inegi.org.mx/app/buscador/default.html?q=Tasa+de+condiciones+cr%C3%ADticas+de+ocupaci%C3%B3n#tabMCcollapse-Indicadores
+[11] Paz. J. A. (2014). Los trabajadores desanimados. El Economista. Recuperado de https://eleconomista.com.ar/2014-09-los-trabajadores-desanimados/
+[12] DaVanzo, J. (1978). Does Unemployment Affect Migration? Evidence from Micro Data. The Review of Economics and Statistics, 60(4), 504-514. doi:10.2307/1924242
+[13] Hernández, E., Ramírez, O., González, J. M., Pérez, F., & Espinoza, L. E. (2012). Análisis del desempleo, la migración y la pobreza en México. pp. 835-847. Recuperado de https://www.redalyc.org/pdf/141/14123097006.pdf
+[14] DaVanzo, J. (1978). Does unemployment affect migration? evidence from micro data. Santa Monica, CA: RAND Corporation. Recuperado de https://www.rand.org/pubs/papers/P5786.html
+
+
+
